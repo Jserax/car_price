@@ -1,0 +1,4 @@
+minio
+numpy
+pandas
+s3fs

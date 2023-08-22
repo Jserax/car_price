@@ -1,0 +1,12 @@
+numpy
+pandas
+mlflow
+bentoml
+scikit-learn
+sqlalchemy
+psycopg2-binary
+minio
+catboost
+optuna
+evidently
+requests

@@ -1,0 +1,4 @@
+catboost
+pandas
+fastapi
+uvicorn

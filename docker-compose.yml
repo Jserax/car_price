@@ -1,0 +1,122 @@
+version: '3.8'
+x-airflow-common: &airflow-common
+    image: airflow:latest
+    environment:
+        - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+        - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2:/${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/airflow
+        - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/airflow
+        - AIRFLOW__CORE__LOAD_EXAMPLES=False
+        - AIRFLOW__CORE__LOGGING_LEVEL=INFO
+    volumes:
+        - ./airflow:/root/airflow
+    networks:
+        - postgres
+        - minio
+    depends_on: &airflow-common-depends-on
+        postgresql:
+            condition: service_healthy
+
+services:  
+    postgres:
+        image: postgres:latest
+        container_name: postgres
+        ports:
+            - "5432:5432" 
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        networks:
+            - postgres
+        healthcheck:
+            test: ["CMD", "pg_isready", "-U", "postgres"]
+            interval: 30s
+            retries: 3
+            start_period: 5s
+
+    minio:
+        image: minio/minio:latest
+        container_name: minio
+        ports:
+            - "9000:9000"
+            - "9001:9001"
+        environment:
+            - MINIO_ROOT_USER=${ACCESS_KEY}
+            - MINIO_ROOT_PASSWORD=${SECRET_KEY}
+        command: server /data --console-address ":9001"
+        volumes:
+            - minio_data:/data
+        networks:
+            - minio
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 30s
+            retries: 3
+            start_period: 5s
+
+    minio-init:
+        image: minio-init:latest
+        networks:
+            - minio
+        depends_on:
+            minio:
+                condition: service_healthy
+        command: python3 main.py
+            
+
+    mlflow:
+        image: mlflow:latest
+        container_name: mlflow
+        ports:
+            - "5000:5000"
+        environment:
+            - MLFLOW_S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+            - AWS_ACCESS_KEY_ID=${ACCESS_KEY}
+            - AWS_SECRET_ACCESS_KEY=${SECRET_KEY}
+        command: mlflow server -w 1 --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/mlflow --default-artifact-root s3://mlflow --host 0.0.0.0 --port 5000      
+        networks:
+            - postgres 
+            - minio
+        depends_on:
+            postgresql:
+                condition: service_healthy
+            minio-init:
+                condition: service_completed_successfully
+
+    airflow-init:
+        << : *airflow-common
+        container_name: airflow-init
+        entrypoint: /bin/bash
+        command:
+            - -c
+            - |
+              airflow db init
+              airflow users create -r Admin -u admin -f admin -l admin -e admin@airflow.org -p admin
+
+    airflow-webserver:
+        << : *airflow-common
+        container_name: airflow-webserver
+        ports:
+            - 8080:8080
+        command: airflow webserver -w 1
+        depends_on: 
+            <<: *airflow-common-depends-on
+            airflow-init:
+                condition: service_completed_successfully
+
+    airflow-scheduler:
+        << : *airflow-common
+        container_name: airflow-scheduler
+        command: airflow scheduler
+        depends_on: 
+            <<: *airflow-common-depends-on
+            airflow-init:
+                condition: service_completed_successfully
+
+networks:
+  postgres:
+    driver: bridge
+  minio:
+    driver: bridge  
+volumes:
+    postgres_data: 
+    minio_data: 
+    
