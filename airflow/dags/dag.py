@@ -23,7 +23,8 @@ with DAG(
     process_data_ = PythonOperator(python_callable=process_data, task_id="process_data")
     train_model_ = PythonOperator(python_callable=train_model, task_id="train_model")
     build_docker_image = BashOperator(
-        bash_command="docker build ", task_id="build_image"
+        bash_command="docker build -t skyraxer/web:latest /webservice",
+        task_id="build_image",
     )
 
     (

@@ -10,11 +10,11 @@ from airflow.models import Variable
 
 def train_model():
     params = {
-        "learning_rate": 0.135,
-        "n_estimators": 3000,
-        "depth": 10,
-        "l2_leaf_reg": 2,
-        "min_data_in_leaf": 1500,
+        "learning_rate": 0.215,
+        "n_estimators": 1500,
+        "depth": 9,
+        "l2_leaf_reg": 1.2,
+        "min_data_in_leaf": 1000,
         "random_strength": 40,
         "loss_function": "RMSE",
     }
@@ -85,3 +85,4 @@ def train_model():
             registered_model_name="car_price",
             input_example=input_example,
         )
+    model.save_model("../webservice/model.cb")

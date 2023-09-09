@@ -11,6 +11,7 @@ x-airflow-common: &airflow-common
         - .env
     volumes:
         - ./airflow:/root/airflow
+        - /var/run/docker.sock:/var/run/docker.sock
     networks:
         - postgres
         - minio
@@ -77,12 +78,13 @@ services:
         ports:
             - "5000:5000"
         environment:
-            - MLFLOW_S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+            - MLFLOW_S3_ENDPOINT_URL=http://${S3_ENDPOINT_URL}
             - AWS_ACCESS_KEY_ID=${ACCESS_KEY}
             - AWS_SECRET_ACCESS_KEY=${SECRET_KEY}
+            - MLFLOW_S3_IGNORE_TLS=true
         env_file:
             - .env
-        command: mlflow server -w 1 --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/mlflow --default-artifact-root s3://mlflow --host 0.0.0.0 --port 5000      
+        command: mlflow server -w 2 --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/mlflow --artifacts-destination s3://mlflow --host 0.0.0.0 --port 5000 --serve-artifacts
         networks:
             - postgres 
             - minio

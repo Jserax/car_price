@@ -1,4 +1,4 @@
-from catboost import Pool
+from catboost import CatBoostRegressor, Pool
 from fastapi import FastAPI, status
 from pandas import DataFrame
 from pydantic import BaseModel
@@ -31,10 +31,8 @@ class Response(BaseModel):
 
 @app.on_event("startup")
 def startup_event():
-    from mlflow.catboost import load_model
-
     global model
-    model = load_model("runs:/")
+    model = CatBoostRegressor().load_model("./model.cb")
 
 
 @app.get(
@@ -49,7 +47,7 @@ def get_health() -> HealthCheck:
     return HealthCheck(status="OK")
 
 
-@app.get(
+@app.post(
     "/predict",
     tags=["predict"],
     summary="Predict the price of a car",
@@ -68,10 +66,10 @@ def predict(input_data: CarFeatures):
         "location",
         "engineName",
     ]
-    data = DataFrame(input_data.dict())
+    data = DataFrame(input_data.dict(), index=[0])
     data["engineDisplacement"] = (
         data["engineDisplacement"].str.split(" ").str[0].astype("float")
     )
     data = Pool(data=data, cat_features=cat_cols)
-    model.predict(data)
-    return {"text": "Sentiment Analysis"}
+    price = model.predict(data)
+    return {"price": f"{price[0]}"}
