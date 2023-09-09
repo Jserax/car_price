@@ -1,15 +1,23 @@
 import os
 
-import mlflow
 import pandas as pd
 from catboost import CatBoostRegressor, Pool
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-from airflow import Variable
+import mlflow
+from airflow.models import Variable
 
 
 def train_model():
-    params = {}
+    params = {
+        "learning_rate": 0.135,
+        "n_estimators": 3000,
+        "depth": 10,
+        "l2_leaf_reg": 2,
+        "min_data_in_leaf": 1500,
+        "random_strength": 40,
+        "loss_function": "RMSE",
+    }
     cat_cols = [
         "brand",
         "name",
@@ -21,8 +29,8 @@ def train_model():
         "engineName",
     ]
     train_data = Variable.get("train_data")
-    train = pd.read_csv(
-        filepath_or_buffer=train_data,
+    train = pd.read_parquet(
+        path=train_data,
         storage_options={
             "key": os.environ["ACCESS_KEY"],
             "secret": os.environ["SECRET_KEY"],
@@ -33,8 +41,8 @@ def train_model():
         },
     )
     test_data = Variable.get("test_data")
-    test = pd.read_csv(
-        filepath_or_buffer=test_data,
+    test = pd.read_parquet(
+        path=test_data,
         storage_options={
             "key": os.environ["ACCESS_KEY"],
             "secret": os.environ["SECRET_KEY"],
@@ -63,7 +71,7 @@ def train_model():
         mean_squared_error(test["price"], y_pred),
         mean_absolute_error(test["price"], y_pred),
     ]
-    mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+    mlflow.set_tracking_uri(f'http://{os.environ["MLFLOW_TRACKING_URI"]}')
     mlflow.set_experiment("car_price")
     with mlflow.start_run():
         mlflow.log_params(params)

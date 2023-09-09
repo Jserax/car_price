@@ -11,14 +11,15 @@ def make_buckets():
         endpoint=os.environ["S3_ENDPOINT_URL"],
         access_key=os.environ["ACCESS_KEY"],
         secret_key=os.environ["SECRET_KEY"],
+        secure=False,
     )
     client.make_bucket("mlflow")
     client.make_bucket("datalake")
     client.make_bucket("datasets")
 
 
-def push_data(path: str):
-    data = pd.read_parquet("./data/car_prices.parquet", index_col=0)
+def push_data():
+    data = pd.read_parquet("./data/car_prices.parquet")
     current_date = datetime.now().timestamp()
     max_date = (datetime.now() + timedelta(minutes=45)).timestamp()
     random.uniform(current_date, max_date, size=data.shape[0])
@@ -37,3 +38,8 @@ def push_data(path: str):
             },
         },
     )
+
+
+if __name__ == "__main__":
+    make_buckets()
+    push_data()

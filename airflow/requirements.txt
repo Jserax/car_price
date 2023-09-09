@@ -1,12 +1,11 @@
 numpy
 pandas
-mlflow
-bentoml
 scikit-learn
 sqlalchemy
 psycopg2-binary
 minio
 catboost
-optuna
-evidently
-requests
+apache-airflow
+s3fs
+boto3
+mlflow==2.5.0

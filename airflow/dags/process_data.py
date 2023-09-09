@@ -5,15 +5,14 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from airflow import Variable
+from airflow.models import Variable
 
 
 def get_raw_data() -> None:
     """save data for a certain interval from the datalake"""
 
     df = pd.read_parquet(
-        filepath_or_buffer="s3://datalake/data.parquet",
-        index_col=0,
+        path="s3://datalake/data.parquet",
         storage_options={
             "key": os.environ["ACCESS_KEY"],
             "secret": os.environ["SECRET_KEY"],
@@ -23,10 +22,12 @@ def get_raw_data() -> None:
             },
         },
     )
-    start_date = Variable.get("car_last_date", datetime(year=2000).timestamp())
+    start_date = float(
+        Variable.get("car_last_date", datetime(year=2000, month=1, day=1).timestamp())
+    )
     end_date = datetime.now().timestamp()
-    df = df[(df.timestamp > start_date) & (df.timestamp <= end_date)]
-    date = datetime.fromtimestamp(end_date).strftime("%d-%m-%y_%H:%M")
+    df = df[(df["timestamp"] > start_date) & (df["timestamp"] <= end_date)]
+    date = datetime.fromtimestamp(float(end_date)).strftime("%d-%m-%y_%H:%M")
     Variable.set("car_last_date", end_date)
     raw_data = f"s3://datasets/raw_{date}.parquet"
     Variable.set("raw_data", raw_data)
@@ -47,7 +48,7 @@ def get_raw_data() -> None:
 def process_data() -> None:
     """process raw data, split and save"""
 
-    def cmn(x: pd.Series) -> np.float:
+    def cmn(x: pd.Series) -> np.float32:
         try:
             return x.mode()[0]
         except:
@@ -56,7 +57,7 @@ def process_data() -> None:
     def process_split(
         split: pd.DataFrame, num_cols: list, cat_cols: list
     ) -> pd.DataFrame:
-        df = split.drop(columns=["vehicleConfiguration", "link", "parse_date"])
+        df = split.drop(columns=["vehicleConfiguration", "link", "parse_date", "date"])
         df.engineDisplacement = (
             df.engineDisplacement.str.split(" ").str[0].astype("float")
         )
@@ -77,10 +78,10 @@ def process_data() -> None:
         return df
 
     date = Variable.get("car_last_date")
-    date = datetime.fromtimestamp(date).strftime("%d-%m-%y_%H:%M")
+    date = datetime.fromtimestamp(float(date)).strftime("%d-%m-%y_%H:%M")
     raw_data = Variable.get("raw_data")
     df = pd.read_parquet(
-        filepath_or_buffer=raw_data,
+        path=raw_data,
         storage_options={
             "key": os.environ["ACCESS_KEY"],
             "secret": os.environ["SECRET_KEY"],
@@ -107,7 +108,7 @@ def process_data() -> None:
 
     train_data = f"s3://datasets/train_{date}.parquet"
     Variable.set("train_data", train_data)
-    df.to_parquet(
+    train.to_parquet(
         train_data,
         index=False,
         storage_options={
@@ -121,7 +122,7 @@ def process_data() -> None:
     )
     test_data = f"s3://datasets/test_{date}.parquet"
     Variable.set("test_data", test_data)
-    df.to_parquet(
+    test.to_parquet(
         test_data,
         index=False,
         storage_options={

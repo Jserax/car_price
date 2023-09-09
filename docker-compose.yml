@@ -1,12 +1,14 @@
 version: '3.8'
 x-airflow-common: &airflow-common
-    image: airflow:latest
+    image: skyraxer/airflow:latest
     environment:
         - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-        - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2:/${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/airflow
+        - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/airflow
         - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/airflow
         - AIRFLOW__CORE__LOAD_EXAMPLES=False
         - AIRFLOW__CORE__LOGGING_LEVEL=INFO
+    env_file:
+        - .env
     volumes:
         - ./airflow:/root/airflow
     networks:
@@ -17,11 +19,13 @@ x-airflow-common: &airflow-common
             condition: service_healthy
 
 services:  
-    postgres:
-        image: postgres:latest
+    postgresql:
+        image: skyraxer/postgres:latest
         container_name: postgres
         ports:
             - "5432:5432" 
+        env_file:
+            - .env
         volumes:
             - postgres_data:/var/lib/postgresql/data
         networks:
@@ -41,6 +45,8 @@ services:
         environment:
             - MINIO_ROOT_USER=${ACCESS_KEY}
             - MINIO_ROOT_PASSWORD=${SECRET_KEY}
+        env_file:
+            - .env
         command: server /data --console-address ":9001"
         volumes:
             - minio_data:/data
@@ -53,7 +59,10 @@ services:
             start_period: 5s
 
     minio-init:
-        image: minio-init:latest
+        image: skyraxer/minio-init:latest
+        container_name: minio-init
+        env_file:
+            - .env
         networks:
             - minio
         depends_on:
@@ -63,7 +72,7 @@ services:
             
 
     mlflow:
-        image: mlflow:latest
+        image: skyraxer/mlflow:latest
         container_name: mlflow
         ports:
             - "5000:5000"
@@ -71,6 +80,8 @@ services:
             - MLFLOW_S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
             - AWS_ACCESS_KEY_ID=${ACCESS_KEY}
             - AWS_SECRET_ACCESS_KEY=${SECRET_KEY}
+        env_file:
+            - .env
         command: mlflow server -w 1 --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_DB}/mlflow --default-artifact-root s3://mlflow --host 0.0.0.0 --port 5000      
         networks:
             - postgres 
